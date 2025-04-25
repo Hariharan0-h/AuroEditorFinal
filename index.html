@@ -131,20 +131,42 @@
       </div>
 
       <div id="canvas-container">
-        <canvas id="editorCanvas" width="1000" height="600"></canvas>
+        <div class="canvas-wrapper">
+          <canvas id="editorCanvas" width="794" height="1123"></canvas>
+        </div>
+        
         <div id="table-grid" class="hidden">
           <div class="grid-title">Insert Table</div>
           <div class="grid-container"></div>
           <div class="dimension-display">0 x 0</div>
         </div>
-        <div class="zoom-controls">
-          <button class="zoom-btn" id="zoom-out-btn">
-            <i class="fas fa-minus"></i>
-          </button>
-          <div class="zoom-level">100%</div>
-          <button class="zoom-btn" id="zoom-in-btn">
-            <i class="fas fa-plus"></i>
-          </button>
+        
+        <!-- Fixed controls container -->
+        <div class="fixed-controls-container">
+          <div class="page-controls">
+            <button class="page-btn" id="prev-page-btn" disabled>
+              <i class="fas fa-chevron-left"></i>
+            </button>
+            <div class="page-indicator">
+              Page <span id="current-page">1</span> of <span id="total-pages">1</span>
+            </div>
+            <button class="page-btn" id="next-page-btn" disabled>
+              <i class="fas fa-chevron-right"></i>
+            </button>
+            <button class="page-btn add-page-btn" id="add-page-btn">
+              <i class="fas fa-plus"></i> Add Page
+            </button>
+          </div>
+          
+          <div class="zoom-controls">
+            <button class="zoom-btn" id="zoom-out-btn">
+              <i class="fas fa-minus"></i>
+            </button>
+            <div class="zoom-level">100%</div>
+            <button class="zoom-btn" id="zoom-in-btn">
+              <i class="fas fa-plus"></i>
+            </button>
+          </div>
         </div>
       </div>
 

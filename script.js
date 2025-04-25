@@ -15,6 +15,10 @@ class CanvasEditor {
             color: '#000000'
         };
         
+        // Multiple pages support
+        this.pages = [];
+        this.currentPageIndex = 0;
+        
         this.init();
     }
     
@@ -23,7 +27,6 @@ class CanvasEditor {
         this.initEventListeners();
         this.initTableGrid();
         this.initFieldModal();
-        
         
         setTimeout(() => {
             this.addTextbox();
@@ -135,6 +138,78 @@ class CanvasEditor {
         document.getElementById('context-delete').addEventListener('click', () => this.deleteContextItem());
         
         this.canvas.on('mouse:down', e => this.handleContextMenu(e));
+        
+        // Add page controls event listeners
+        document.getElementById('add-page-btn').addEventListener('click', () => this.addNewPage());
+        document.getElementById('prev-page-btn').addEventListener('click', () => this.navigatePage(-1));
+        document.getElementById('next-page-btn').addEventListener('click', () => this.navigatePage(1));
+    }
+    
+    // Save current page to pages array
+    saveCurrentPage() {
+        if (this.currentPageIndex >= 0 && this.currentPageIndex < this.pages.length) {
+            this.pages[this.currentPageIndex] = this.canvas.toJSON();
+        } else {
+            // If this is the first page being saved
+            this.pages.push(this.canvas.toJSON());
+        }
+    }
+    
+    // Add a new page
+    addNewPage() {
+        // Save current page
+        this.saveCurrentPage();
+        
+        // Create a new empty page
+        const newPageIndex = this.pages.length;
+        
+        // Create a blank canvas for the new page
+        this.canvas.clear();
+        
+        // Add the blank page to the pages array
+        this.pages.push(this.canvas.toJSON());
+        
+        // Update current page index
+        this.currentPageIndex = newPageIndex;
+        
+        // Update page indicator
+        this.updatePageIndicator();
+        
+        this.showNotification('New page added');
+    }
+    
+    // Navigate to the previous or next page
+    navigatePage(direction) {
+        const newPageIndex = this.currentPageIndex + direction;
+        
+        // Check if the new index is valid
+        if (newPageIndex >= 0 && newPageIndex < this.pages.length) {
+            // Save current page
+            this.saveCurrentPage();
+            
+            // Load the target page
+            this.canvas.loadFromJSON(this.pages[newPageIndex], () => {
+                this.canvas.renderAll();
+            });
+            
+            // Update current page index
+            this.currentPageIndex = newPageIndex;
+            
+            // Update page indicator
+            this.updatePageIndicator();
+            
+            this.showNotification(`Navigated to page ${newPageIndex + 1}`);
+        }
+    }
+    
+    // Update the page indicator in the UI
+    updatePageIndicator() {
+        document.getElementById('current-page').textContent = this.currentPageIndex + 1;
+        document.getElementById('total-pages').textContent = this.pages.length;
+        
+        // Enable/disable navigation buttons
+        document.getElementById('prev-page-btn').disabled = (this.currentPageIndex === 0);
+        document.getElementById('next-page-btn').disabled = (this.currentPageIndex === this.pages.length - 1);
     }
     
     initTableGrid() {
@@ -695,12 +770,30 @@ class CanvasEditor {
         
         // Update zoom display
         document.querySelector('.zoom-level').textContent = `${this.currentZoom}%`;
-        document.getElementById('zoom-status').textContent = `${this.currentZoom}%`;
+        
+        // Update canvas wrapper dimensions to accommodate zoomed canvas
+        // This ensures scrollbars appear when needed
+        const canvasWrapper = document.querySelector('.canvas-wrapper');
+        if (canvasWrapper) {
+            const width = this.canvas.width * zoom;
+            const height = this.canvas.height * zoom;
+            canvasWrapper.style.width = `${width}px`;
+            canvasWrapper.style.height = `${height}px`;
+        }
     }
     
     saveProject() {
-        const jsonData = JSON.stringify(this.canvas.toJSON());
-        localStorage.setItem('canvasEditorProject', jsonData);
+        // Save the current page
+        this.saveCurrentPage();
+        
+        // Create a project data object with all pages
+        const projectData = {
+            pages: this.pages,
+            currentPageIndex: this.currentPageIndex
+        };
+        
+        // Save to localStorage
+        localStorage.setItem('canvasEditorProject', JSON.stringify(projectData));
         this.showNotification('Project saved successfully');
     }
     
@@ -708,13 +801,42 @@ class CanvasEditor {
         const savedProject = localStorage.getItem('canvasEditorProject');
         if (savedProject) {
             try {
-                this.canvas.loadFromJSON(savedProject, () => {
-                    this.canvas.renderAll();
-                    this.showNotification('Project loaded from local storage');
-                });
+                // Parse the project data
+                const projectData = JSON.parse(savedProject);
+                
+                // Load pages
+                if (projectData.pages && projectData.pages.length > 0) {
+                    this.pages = projectData.pages;
+                    this.currentPageIndex = projectData.currentPageIndex || 0;
+                    
+                    // Load the current page
+                    this.canvas.loadFromJSON(this.pages[this.currentPageIndex], () => {
+                        this.canvas.renderAll();
+                        
+                        // Initialize page indicator with loaded project data
+                        this.updatePageIndicator();
+                        
+                        this.showNotification('Project loaded from local storage');
+                    });
+                } else {
+                    // If there's no pages data, initialize with current canvas
+                    this.pages = [this.canvas.toJSON()];
+                    this.currentPageIndex = 0;
+                    this.updatePageIndicator();
+                }
             } catch (error) {
                 this.showNotification('Error loading project', 'error');
+                
+                // Initialize with current canvas
+                this.pages = [this.canvas.toJSON()];
+                this.currentPageIndex = 0;
+                this.updatePageIndicator();
             }
+        } else {
+            // No saved project, initialize with current canvas
+            this.pages = [this.canvas.toJSON()];
+            this.currentPageIndex = 0;
+            this.updatePageIndicator();
         }
     }
     
@@ -723,16 +845,16 @@ class CanvasEditor {
         
         switch(format) {
             case 'svg':
-                details.value = "SVG format is ideal for vector graphics that can be resized without losing quality.";
+                details.value = "SVG format is ideal for vector graphics that can be resized without losing quality. For multi-page projects, only the current page will be exported.";
                 break;
             case 'png':
-                details.value = "PNG format is a raster image format with lossless compression.";
+                details.value = "PNG format is a raster image format with lossless compression. For multi-page projects, only the current page will be exported.";
                 break;
             case 'json':
-                details.value = "JSON format contains the complete project data that can be reopened in this editor.";
+                details.value = "JSON format contains the complete project data that can be reopened in this editor. All pages will be included in the export.";
                 break;
             case 'html':
-                details.value = "HTML format exports the canvas as an HTML document viewable in any browser.";
+                details.value = "HTML format exports the canvas as an HTML document viewable in any browser. For multi-page projects, only the current page will be exported.";
                 break;
         }
     }
@@ -741,33 +863,123 @@ class CanvasEditor {
         const format = document.getElementById('export-format').value;
         let data, filename, mime;
         
+        // Make sure current page is saved
+        this.saveCurrentPage();
+        
         switch(format) {
             case 'svg':
                 data = this.canvas.toSVG();
-                filename = 'canvas-export.svg';
+                filename = `canvas-export-page${this.currentPageIndex + 1}.svg`;
                 mime = 'image/svg+xml';
                 break;
             case 'png':
                 data = this.canvas.toDataURL({format: 'png'});
-                filename = 'canvas-export.png';
+                filename = `canvas-export-page${this.currentPageIndex + 1}.png`;
                 mime = 'image/png';
                 break;
             case 'json':
-                data = JSON.stringify(this.canvas.toJSON());
-                filename = 'canvas-project.json';
+                // Export all pages
+                const projectData = {
+                    pages: this.pages,
+                    currentPageIndex: this.currentPageIndex
+                };
+                data = JSON.stringify(projectData);
+                filename = 'canvas-project-all-pages.json';
                 mime = 'application/json';
                 break;
             case 'html':
-                data = `<!DOCTYPE html>
+                // For HTML export, we'll create a multi-page document with proper A4 sizing and page breaks
+                let htmlContent = `<!DOCTYPE html>
 <html>
 <head>
-  <title>Canvas Export</title>
+  <title>Canvas Export - All Pages</title>
+  <style>
+    @media print {
+      @page {
+        size: A4;
+        margin: 0;
+      }
+      .page-break {
+        page-break-after: always;
+      }
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f0f0f0;
+    }
+    .page-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    .page {
+      width: 794px;
+      height: 1123px;
+      background-color: white;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .page:last-child {
+      margin-bottom: 0;
+    }
+    .page-number {
+      text-align: center;
+      font-family: Arial, sans-serif;
+      color: #777;
+      margin-bottom: 5px;
+    }
+  </style>
 </head>
-<body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f0f0f0;">
-  ${this.canvas.toSVG()}
+<body>
+<div class="page-container">`;
+
+                // Save current page index to restore it later
+                const currentPageIdx = this.currentPageIndex;
+                
+                // First add current page
+                htmlContent += `
+  <div class="page-number">Page ${currentPageIdx + 1} of ${this.pages.length}</div>
+  <div class="page">
+    ${this.canvas.toSVG()}
+  </div>`;
+                
+                // If there are multiple pages, add each one with a page break
+                if (this.pages.length > 1) {
+                    // Add all other pages
+                    for (let i = 0; i < this.pages.length; i++) {
+                        // Skip the current page as it's already added
+                        if (i === currentPageIdx) continue;
+                        
+                        // Load the page temporarily to get its SVG
+                        this.canvas.loadFromJSON(this.pages[i], () => {
+                            this.canvas.renderAll();
+                        });
+                        
+                        htmlContent += `
+  <div class="page-break"></div>
+  <div class="page-number">Page ${i + 1} of ${this.pages.length}</div>
+  <div class="page">
+    ${this.canvas.toSVG()}
+  </div>`;
+                    }
+                    
+                    // Restore the current page
+                    this.canvas.loadFromJSON(this.pages[currentPageIdx], () => {
+                        this.canvas.renderAll();
+                    });
+                }
+                
+                // Close the HTML document
+                htmlContent += `
+</div>
 </body>
 </html>`;
-                filename = 'canvas-export.html';
+
+                data = htmlContent;
+                filename = `canvas-export-all-pages.html`;
                 mime = 'text/html';
                 break;
         }
