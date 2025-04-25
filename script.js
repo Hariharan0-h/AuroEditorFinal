@@ -7,6 +7,19 @@ class CanvasEditor {
             rows: 0,
             cols: 0
         };
+
+        this.pageBorder = {
+            enabled: false,
+            width: 1,
+            style: 'solid',
+            color: '#000000',
+            padding: {
+                top: 10,
+                right: 10,
+                bottom: 10,
+                left: 10
+            }
+        };
         
         this.textProps = {
             bold: false,
@@ -92,6 +105,18 @@ class CanvasEditor {
         document.getElementById('bold-btn').addEventListener('click', () => this.toggleFormat('bold'));
         document.getElementById('italic-btn').addEventListener('click', () => this.toggleFormat('italic'));
         document.getElementById('underline-btn').addEventListener('click', () => this.toggleFormat('underline'));
+
+        document.getElementById('page-border-btn').addEventListener('click', () => this.openModal('border-modal'));
+        document.getElementById('apply-border-btn').addEventListener('click', () => this.applyPageBorder());
+        
+        // Update border color picker
+        const borderColorPicker = document.getElementById('border-color');
+        borderColorPicker.addEventListener('input', e => {
+            document.getElementById('border-color-display').style.backgroundColor = e.target.value;
+        });
+        
+        // Set initial color display
+        document.getElementById('border-color-display').style.backgroundColor = '#000000';
         
         const colorPicker = document.getElementById('color-picker');
         colorPicker.addEventListener('input', e => this.setTextColor(e.target.value));
@@ -153,10 +178,16 @@ class CanvasEditor {
     // Save current page to pages array
     saveCurrentPage() {
         if (this.currentPageIndex >= 0 && this.currentPageIndex < this.pages.length) {
-            this.pages[this.currentPageIndex] = this.canvas.toJSON();
+            const pageData = this.canvas.toJSON(['name']);
+            // Add border properties
+            pageData.pageBorder = this.pageBorder;
+            this.pages[this.currentPageIndex] = pageData;
         } else {
             // If this is the first page being saved
-            this.pages.push(this.canvas.toJSON());
+            const pageData = this.canvas.toJSON(['name']);
+            // Add border properties
+            pageData.pageBorder = this.pageBorder;
+            this.pages.push(pageData);
         }
     }
     
@@ -171,8 +202,24 @@ class CanvasEditor {
         // Create a blank canvas for the new page
         this.canvas.clear();
         
+        // Reset page border for new page (can be inherited from current page if needed)
+        this.pageBorder = {
+            enabled: false,
+            width: 1,
+            style: 'solid',
+            color: '#000000',
+            padding: {
+                top: 10,
+                right: 10,
+                bottom: 10,
+                left: 10
+            }
+        };
+        
         // Add the blank page to the pages array
-        this.pages.push(this.canvas.toJSON());
+        const pageData = this.canvas.toJSON(['name']);
+        pageData.pageBorder = this.pageBorder;
+        this.pages.push(pageData);
         
         // Update current page index
         this.currentPageIndex = newPageIndex;
@@ -181,6 +228,140 @@ class CanvasEditor {
         this.updatePageIndicator();
         
         this.showNotification('New page added');
+    }
+
+    applyPageBorder() {
+        // Get border settings from inputs
+        const width = parseInt(document.getElementById('border-width').value);
+        const style = document.getElementById('border-style').value;
+        const color = document.getElementById('border-color').value;
+        
+        // Get padding values
+        const paddingTop = parseInt(document.getElementById('padding-top').value) || 0;
+        const paddingRight = parseInt(document.getElementById('padding-right').value) || 0;
+        const paddingBottom = parseInt(document.getElementById('padding-bottom').value) || 0;
+        const paddingLeft = parseInt(document.getElementById('padding-left').value) || 0;
+        
+        // Update border properties
+        this.pageBorder = {
+            enabled: true,
+            width,
+            style,
+            color,
+            padding: {
+                top: paddingTop,
+                right: paddingRight,
+                bottom: paddingBottom,
+                left: paddingLeft
+            }
+        };
+        
+        // Apply border to canvas
+        this.renderPageBorder();
+        
+        // Close the modal
+        this.closeModal('border-modal');
+        this.showNotification('Page border applied');
+    }
+
+    renderPageBorder() {
+        // Remove existing border if any
+        this.removePageBorder();
+        
+        if (!this.pageBorder.enabled) return;
+        
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+        const border = this.pageBorder;
+        const padding = border.padding || { top: 0, right: 0, bottom: 0, left: 0 };
+        
+        // Create border as a rect with no fill, accounting for padding
+        const borderRect = new fabric.Rect({
+            left: padding.left + (border.width / 2),
+            top: padding.top + (border.width / 2),
+            width: width - padding.left - padding.right - border.width,
+            height: height - padding.top - padding.bottom - border.width,
+            fill: 'transparent',
+            stroke: border.color,
+            strokeWidth: border.width,
+            strokeDashArray: border.style === 'dashed' ? [10, 5] : 
+                            border.style === 'dotted' ? [2, 3] :
+                            border.style === 'double' ? [1, 0] : null,
+            selectable: false,
+            evented: false,
+            name: 'pageBorder'
+        });
+        
+        // Add to canvas
+        this.canvas.add(borderRect);
+        
+        // Send to back so it doesn't overlap with content
+        this.canvas.sendToBack(borderRect);
+        
+        // Render the changes
+        this.canvas.renderAll();
+    }
+    
+    // Add method to remove the page border
+    removePageBorder() {
+        // Find and remove border object
+        const objects = this.canvas.getObjects();
+        for (let i = 0; i < objects.length; i++) {
+            if (objects[i].name === 'pageBorder') {
+                this.canvas.remove(objects[i]);
+                break;
+            }
+        }
+    }
+    
+    // Add method to render the page border
+    renderPageBorder() {
+        // Remove existing border if any
+        this.removePageBorder();
+        
+        if (!this.pageBorder.enabled) return;
+        
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+        const border = this.pageBorder;
+        
+        // Create border as a rect with no fill
+        const borderRect = new fabric.Rect({
+            left: border.width / 2,
+            top: border.width / 2,
+            width: width - border.width,
+            height: height - border.width,
+            fill: 'transparent',
+            stroke: border.color,
+            strokeWidth: border.width,
+            strokeDashArray: border.style === 'dashed' ? [10, 5] : 
+                            border.style === 'dotted' ? [2, 3] :
+                            border.style === 'double' ? [1, 0] : null,
+            selectable: false,
+            evented: false,
+            name: 'pageBorder'
+        });
+        
+        // Add to canvas
+        this.canvas.add(borderRect);
+        
+        // Send to back so it doesn't overlap with content
+        this.canvas.sendToBack(borderRect);
+        
+        // Render the changes
+        this.canvas.renderAll();
+    }
+    
+    // Add method to remove the page border
+    removePageBorder() {
+        // Find and remove border object
+        const objects = this.canvas.getObjects();
+        for (let i = 0; i < objects.length; i++) {
+            if (objects[i].name === 'pageBorder') {
+                this.canvas.remove(objects[i]);
+                break;
+            }
+        }
     }
     
     // Navigate to the previous or next page
@@ -194,6 +375,16 @@ class CanvasEditor {
             
             // Load the target page
             this.canvas.loadFromJSON(this.pages[newPageIndex], () => {
+                // Get border settings from the loaded page
+                if (this.pages[newPageIndex].pageBorder) {
+                    this.pageBorder = this.pages[newPageIndex].pageBorder;
+                    
+                    // Apply border if enabled
+                    if (this.pageBorder.enabled) {
+                        this.renderPageBorder();
+                    }
+                }
+                
                 this.canvas.renderAll();
             });
             

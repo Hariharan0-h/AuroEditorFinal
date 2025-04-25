@@ -372,6 +372,59 @@ header h2 {
   }
 }
 
+#page-border-btn.active {
+  background-color: var(--primary-light);
+  color: white;
+}
+
+/* Border Color Picker Styles */
+.color-input-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+
+#border-color-display {
+  width: 40px;
+  height: 30px;
+  border-radius: 4px;
+  border: 1px solid var(--gray-300);
+  background-color: #000000;
+}
+
+#border-color {
+  height: 30px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  background-color: white;
+}
+
+/* Padding input styles */
+.padding-inputs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.padding-input {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.padding-input label {
+  font-size: 0.8rem;
+  color: var(--gray-600);
+}
+
+.padding-input input {
+  width: 100%;
+  padding: 5px;
+  text-align: center;
+}
+
 /* List formatting button styles */
 #bullet-list-btn.active, 
 #number-list-btn.active {
