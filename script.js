@@ -12,7 +12,9 @@ class CanvasEditor {
             bold: false,
             italic: false,
             underline: false,
-            color: '#000000'
+            color: '#000000',
+            bulletList: false,
+            numberList: false
         };
         
         // Multiple pages support
@@ -84,6 +86,9 @@ class CanvasEditor {
         document.getElementById('add-vline-btn').addEventListener('click', () => this.addShape('vline'));
         document.getElementById('add-hline-btn').addEventListener('click', () => this.addShape('hline'));
         
+        document.getElementById('bullet-list-btn').addEventListener('click', () => this.toggleListFormat('bullet'));
+        document.getElementById('number-list-btn').addEventListener('click', () => this.toggleListFormat('number'));
+
         document.getElementById('bold-btn').addEventListener('click', () => this.toggleFormat('bold'));
         document.getElementById('italic-btn').addEventListener('click', () => this.toggleFormat('italic'));
         document.getElementById('underline-btn').addEventListener('click', () => this.toggleFormat('underline'));
@@ -211,6 +216,80 @@ class CanvasEditor {
         document.getElementById('prev-page-btn').disabled = (this.currentPageIndex === 0);
         document.getElementById('next-page-btn').disabled = (this.currentPageIndex === this.pages.length - 1);
     }
+
+    toggleListFormat(format) {
+        const activeObject = this.canvas.getActiveObject();
+        if (!activeObject || activeObject.type !== 'textbox') return;
+        
+        // Get the current text
+        let text = activeObject.text;
+        const lines = text.split('\n');
+        let formattedLines = [];
+        
+        // Check if format is already applied (simple check)
+        const isAlreadyFormatted = (format === 'bullet') ? 
+            lines[0].startsWith('• ') : 
+            lines[0].match(/^\d+\.\s/);
+        
+        if (isAlreadyFormatted) {
+            // Remove formatting
+            formattedLines = lines.map(line => {
+                if (format === 'bullet') {
+                    return line.startsWith('• ') ? line.substring(2) : line;
+                } else {
+                    return line.replace(/^\d+\.\s/, '');
+                }
+            });
+            
+            // Update button state
+            if (format === 'bullet') {
+                this.textProps.bulletList = false;
+                document.getElementById('bullet-list-btn').classList.remove('active');
+            } else {
+                this.textProps.numberList = false;
+                document.getElementById('number-list-btn').classList.remove('active');
+            }
+        } else {
+            // Apply formatting
+            formattedLines = lines.map((line, index) => {
+                // Remove any existing formatting first
+                let cleanLine = line;
+                if (cleanLine.startsWith('• ')) {
+                    cleanLine = cleanLine.substring(2);
+                } else {
+                    cleanLine = cleanLine.replace(/^\d+\.\s/, '');
+                }
+                
+                // Apply new formatting
+                if (format === 'bullet') {
+                    return cleanLine ? `• ${cleanLine}` : cleanLine;
+                } else {
+                    return cleanLine ? `${index + 1}. ${cleanLine}` : cleanLine;
+                }
+            });
+            
+            // Update button state and deactivate the other list format
+            if (format === 'bullet') {
+                this.textProps.bulletList = true;
+                this.textProps.numberList = false;
+                document.getElementById('bullet-list-btn').classList.add('active');
+                document.getElementById('number-list-btn').classList.remove('active');
+            } else {
+                this.textProps.numberList = true;
+                this.textProps.bulletList = false;
+                document.getElementById('number-list-btn').classList.add('active');
+                document.getElementById('bullet-list-btn').classList.remove('active');
+            }
+        }
+        
+        // Update the text object
+        activeObject.set('text', formattedLines.join('\n'));
+        this.canvas.renderAll();
+        
+        // Show notification
+        const formatName = format === 'bullet' ? 'bullet list' : 'numbered list';
+        this.showNotification(`${formatName} formatting ${isAlreadyFormatted ? 'removed' : 'applied'}`);
+    }
     
     initTableGrid() {
         const gridContainer = document.querySelector('.grid-container');
@@ -315,6 +394,16 @@ class CanvasEditor {
             document.getElementById('underline-btn').classList.toggle('active', !!selected.underline);
             
             const color = selected.fill || '#000000';
+            const lines = selected.text.split('\n');
+            const hasBullets = lines.length > 0 && lines[0].startsWith('• ');
+            const hasNumbers = lines.length > 0 && !!lines[0].match(/^\d+\.\s/);
+
+            document.getElementById('bullet-list-btn').classList.toggle('active', hasBullets);
+            document.getElementById('number-list-btn').classList.toggle('active', hasNumbers);
+
+            this.textProps.bulletList = hasBullets;
+            this.textProps.numberList = hasNumbers;
+
             document.getElementById('color-display').style.backgroundColor = color;
             document.getElementById('color-picker').value = color;
             
@@ -463,7 +552,9 @@ class CanvasEditor {
             fontWeight: 'normal',
             fontStyle: 'normal',
             underline: false,
-            textAlign: 'left'
+            textAlign: 'left',
+            bulletList: false,
+            numberList: false
         });
         
         this.canvas.add(textbox);

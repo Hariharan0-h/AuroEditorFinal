@@ -372,6 +372,37 @@ header h2 {
   }
 }
 
+/* List formatting button styles */
+#bullet-list-btn.active, 
+#number-list-btn.active {
+  background-color: var(--primary-light);
+  color: white;
+}
+
+/* Style for bullet list items inside textbox */
+.canvas-text-bullet {
+  padding-left: 15px;
+  position: relative;
+}
+
+.canvas-text-bullet:before {
+  content: "•";
+  position: absolute;
+  left: 0;
+}
+
+/* Style for numbered list items inside textbox */
+.canvas-text-number {
+  padding-left: 20px;
+  position: relative;
+}
+
+.canvas-text-number:before {
+  content: attr(data-number) ".";
+  position: absolute;
+  left: 0;
+}
+
 .zoom-controls {
   position: absolute;
   bottom: 20px;
