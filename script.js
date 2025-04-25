@@ -547,96 +547,210 @@ class CanvasEditor {
         const tableWidth = 400;
         const cellWidth = tableWidth / cols;
         const cellHeight = 30;
-        const tableHeight = (rows + 1) * cellHeight;
+        const tableHeight = rows * cellHeight;
         
-        const tableObjects = [];
+        // Create a group to hold all cells
+        const cellObjects = [];
         
-        const tableBackground = new fabric.Rect({
-            left: 0,
-            top: 0,
-            width: tableWidth,
-            height: tableHeight,
-            fill: '#f8f9fa',
-            stroke: '#343a40',
-            strokeWidth: 1
-        });
-        tableObjects.push(tableBackground);
-        
-        const headerBackground = new fabric.Rect({
-            left: 0,
-            top: 0,
-            width: tableWidth,
-            height: cellHeight,
-            fill: '#e9ecef',
-            stroke: '#343a40',
-            strokeWidth: 1
-        });
-        tableObjects.push(headerBackground);
-        
-        // Create vertical grid lines
-        for (let c = 1; c < cols; c++) {
-            const x = c * cellWidth;
-            const line = new fabric.Line([x, 0, x, tableHeight], {
-                stroke: '#343a40',
-                strokeWidth: 1
-            });
-            tableObjects.push(line);
-        }
-        
-        // Create horizontal grid lines
-        for (let r = 1; r < rows + 1; r++) {
-            const y = r * cellHeight;
-            const line = new fabric.Line([0, y, tableWidth, y], {
-                stroke: '#343a40',
-                strokeWidth: 1
-            });
-            tableObjects.push(line);
-        }
-        
-        // Add header text
-        for (let c = 0; c < cols; c++) {
-            const header = new fabric.Textbox(`Header ${c+1}`, {
-                left: c * cellWidth + 5,
-                top: 5,
-                width: cellWidth - 10,
-                fontSize: 14,
-                fontFamily: 'Inter',
-                fontWeight: 'bold',
-                fill: '#343a40'
-            });
-            tableObjects.push(header);
-        }
-        
-        // Add cell text
+        // Create individual cells instead of a rigid table structure
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
-                const text = new fabric.Textbox('Cell data', {
-                    left: c * cellWidth + 5,
-                    top: (r + 1) * cellHeight + 5,
-                    width: cellWidth - 10,
+                // Cell background (rectangle)
+                const cellRect = new fabric.Rect({
+                    left: c * cellWidth,
+                    top: r * cellHeight,
+                    width: cellWidth,
+                    height: cellHeight,
+                    fill: 'white',
+                    stroke: '#343a40',
+                    strokeWidth: 1,
+                    selectable: false
+                });
+                
+                // Cell text (editable)
+                const cellText = new fabric.Textbox('', {
+                    left: c * cellWidth + 2,
+                    top: r * cellHeight + 2,
+                    width: cellWidth - 4,
+                    height: cellHeight - 4,
                     fontSize: 14,
                     fontFamily: 'Inter',
-                    fill: '#343a40'
+                    fill: '#343a40',
+                    editable: true,
+                    selectable: true
                 });
-                tableObjects.push(text);
+                
+                // Create a cell group (background + text)
+                const cellGroup = new fabric.Group([cellRect, cellText], {
+                    left: c * cellWidth,
+                    top: r * cellHeight,
+                    subTargetCheck: true,
+                    interactive: true,
+                    hasControls: true,
+                    hasBorders: true,
+                    borderColor: '#4361ee',
+                    cornerColor: '#4361ee',
+                    cornerSize: 6,
+                    transparentCorners: false,
+                    lockMovementX: true,
+                    lockMovementY: true
+                });
+                
+                // Enable editing of the cell's text when selected
+                cellGroup.on('selected', () => {
+                    this.canvas.setActiveObject(cellText);
+                    cellText.enterEditing();
+                    cellText.selectAll();
+                });
+                
+                cellObjects.push(cellGroup);
             }
         }
         
-        // Create the table group
-        const table = new fabric.Group(tableObjects, {
+        // Create a table container group that will hold all cells
+        const tableContainer = new fabric.Group([], {
             left: this.canvas.width / 2 - tableWidth / 2,
             top: this.canvas.height / 2 - tableHeight / 2,
-            selectable: true,
+            width: tableWidth,
+            height: tableHeight,
             subTargetCheck: true,
+            hasControls: true,
+            hasBorders: true,
+            borderColor: '#4361ee',
             cornerColor: '#4361ee',
             cornerSize: 6,
-            transparentCorners: false,
-            borderColor: '#4361ee'
+            transparentCorners: false
         });
         
-        this.canvas.add(table);
-        this.canvas.setActiveObject(table);
-        this.showNotification(`${rows}x${cols} table added`);
+        // Add all cell groups to the table container
+        cellObjects.forEach(cell => {
+            tableContainer.addWithUpdate(cell);
+        });
+        
+        // Make cells independently selectable by adding them to canvas directly
+        // but position them relative to the table container
+        this.canvas.add(tableContainer);
+        
+        // Add ability to resize columns by dragging
+        this.makeTableResizable(tableContainer, rows, cols, cellWidth, cellHeight);
+        
+        this.canvas.setActiveObject(tableContainer);
+        this.showNotification(`${rows}x${cols} editable table added`);
+    }
+
+    makeTableResizable(tableContainer, rows, cols, initialCellWidth, cellHeight) {
+        // Add vertical resize handles between columns
+        for (let c = 1; c < cols; c++) {
+            const x = c * initialCellWidth;
+            
+            const resizeHandle = new fabric.Rect({
+                left: x - 2,
+                top: 0,
+                width: 4,
+                height: rows * cellHeight,
+                fill: 'rgba(67, 97, 238, 0.3)',
+                stroke: 'rgba(67, 97, 238, 0.5)',
+                strokeWidth: 1,
+                opacity: 0,
+                selectable: true,
+                hasBorders: false,
+                hasControls: false,
+                hoverCursor: 'col-resize',
+                excludeFromExport: true,
+                // Store the column index and original position
+                data: {
+                    columnIndex: c,
+                    originalX: x
+                }
+            });
+            
+            // Add hover effect
+            resizeHandle.on('mouseover', () => {
+                resizeHandle.set('opacity', 1);
+                this.canvas.renderAll();
+            });
+            
+            resizeHandle.on('mouseout', () => {
+                resizeHandle.set('opacity', 0);
+                this.canvas.renderAll();
+            });
+            
+            // Add resize functionality
+            resizeHandle.on('mousedown', (e) => {
+                // Store initial positions
+                const startX = e.pointer.x;
+                const columnIndex = resizeHandle.data.columnIndex;
+                const originalX = resizeHandle.data.originalX;
+                
+                // Setup mouse move handler
+                const mouseMoveHandler = (e) => {
+                    const currentX = e.pointer.x;
+                    const deltaX = currentX - startX;
+                    
+                    // Update position of the resize handle
+                    resizeHandle.set({
+                        left: originalX + deltaX - 2
+                    });
+                    
+                    // Update the cells on either side of this column divider
+                    this.updateColumnWidths(tableContainer, columnIndex, deltaX);
+                    
+                    this.canvas.renderAll();
+                };
+                
+                // Setup mouse up handler to remove event listeners
+                const mouseUpHandler = () => {
+                    this.canvas.off('mouse:move', mouseMoveHandler);
+                    this.canvas.off('mouse:up', mouseUpHandler);
+                };
+                
+                // Add temporary event listeners for dragging
+                this.canvas.on('mouse:move', mouseMoveHandler);
+                this.canvas.on('mouse:up', mouseUpHandler);
+            });
+            
+            // Add the resize handle to the canvas, positioned relative to the table
+            this.canvas.add(resizeHandle);
+            resizeHandle.set({
+                left: tableContainer.left + x - 2,
+                top: tableContainer.top
+            });
+        }
+    }
+
+    updateColumnWidths(tableContainer, columnIndex, deltaX) {
+        // Get all the cell groups in the table
+        const cellGroups = tableContainer.getObjects('group');
+        
+        // Update each cell in the affected columns
+        cellGroups.forEach(cellGroup => {
+            const cellRect = cellGroup.getObjects('rect')[0];
+            const cellText = cellGroup.getObjects('textbox')[0];
+            
+            // Calculate the cell's column based on its position
+            const cellCol = Math.round(cellGroup.left / cellRect.width);
+            
+            // Only update cells to the right of the column divider being dragged
+            if (cellCol === columnIndex - 1) {
+                // Expand/contract the cell to the left of the divider
+                cellRect.set('width', cellRect.width + deltaX);
+                cellText.set('width', cellRect.width - 4);
+                cellGroup.addWithUpdate();
+            } else if (cellCol === columnIndex) {
+                // Move and resize the cell to the right of the divider
+                cellGroup.set('left', cellGroup.left + deltaX);
+                cellRect.set('width', cellRect.width - deltaX);
+                cellText.set('width', cellRect.width - 4);
+                cellGroup.addWithUpdate();
+            } else if (cellCol > columnIndex) {
+                // Just move cells further to the right
+                cellGroup.set('left', cellGroup.left + deltaX);
+                cellGroup.addWithUpdate();
+            }
+        });
+        
+        // Update table container
+        tableContainer.addWithUpdate();
     }
     
     openModal(modalId) {
